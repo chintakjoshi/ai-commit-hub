@@ -22,3 +22,27 @@ agents:
     is_active: true
     max_files_per_commit: 3
     min_files_per_commit: 1
+  
+  - name: "docs_writer_2"
+    repo_name: "api-documentation-ai"
+    content_type: "documentation"
+    commit_pattern: "api_docs"
+    is_active: true
+    max_files_per_commit: 2
+    min_files_per_commit: 1
+  
+  - name: "leetcode_solver_3"
+    repo_name: "algorithm-practice-ai"
+    content_type: "leetcode"
+    commit_pattern: "solution_only"
+    is_active: true
+    max_files_per_commit: 3
+    min_files_per_commit: 1
+  
+  - name: "docs_writer_3"
+    repo_name: "tutorials-ai"
+    content_type: "documentation"
+    commit_pattern: "tutorial"
+    is_active: true
+    max_files_per_commit: 2
+    min_files_per_commit: 1
