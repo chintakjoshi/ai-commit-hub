@@ -1,0 +1,24 @@
+agents:
+  - name: "leetcode_solver_1"
+    repo_name: "leetcode-solutions-ai"
+    content_type: "leetcode"
+    commit_pattern: "problem_and_solution"
+    is_active: true
+    max_files_per_commit: 4
+    min_files_per_commit: 2
+  
+  - name: "docs_writer_1"
+    repo_name: "technical-docs-ai"
+    content_type: "documentation"
+    commit_pattern: "docs_only"
+    is_active: true
+    max_files_per_commit: 2
+    min_files_per_commit: 1
+  
+  - name: "leetcode_solver_2"
+    repo_name: "coding-challenges-ai"
+    content_type: "leetcode"
+    commit_pattern: "problem_only"
+    is_active: true
+    max_files_per_commit: 3
+    min_files_per_commit: 1
