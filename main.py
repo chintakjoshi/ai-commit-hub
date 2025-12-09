@@ -1,15 +1,14 @@
 import asyncio
 import yaml
 import sys
-import schedule
-import threading
-import time
+import signal
 from pathlib import Path
 from datetime import datetime
 from config.settings import settings
 from managers.llm_manager import LLMManager
 from managers.github_manager import GitHubManager
-from managers.scheduler_manager import SchedulerManager
+from managers.scheduler_manager import AsyncSchedulerManager
+from managers.state_manager import StateManager
 from agents.leetcode_agent import LeetCodeAgent
 from agents.documentation_agent import DocumentationAgent
 from agents.base_agent import AgentConfig
@@ -18,7 +17,11 @@ import logging
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, settings.log_level),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('auto_committer.log'),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -26,9 +29,14 @@ class AutoCommitterApp:
     def __init__(self):
         self.llm_manager = None
         self.github_manager = GitHubManager()
-        self.scheduler = SchedulerManager()
+        self.scheduler = AsyncSchedulerManager(
+            min_commits_per_day=settings.min_commits_per_day,
+            max_commits_per_day=settings.max_commits_per_day
+        )
+        self.state_manager = StateManager()
         self.agents = {}
         self.is_initialized = False
+        self.should_stop = False
         
     async def initialize(self):
         """Initialize the app asynchronously"""
@@ -41,9 +49,13 @@ class AutoCommitterApp:
         
     async def cleanup(self):
         """Cleanup resources"""
+        if self.scheduler.running:
+            await self.scheduler.stop()
+        
         if self.llm_manager:
             await self.llm_manager.close()
             logger.info("LLM Manager cleaned up")
+        
         self.is_initialized = False
         
     def load_agents_config(self, config_path: str = "config/agents_config.yaml"):
@@ -108,24 +120,26 @@ class AutoCommitterApp:
             if repo_created:
                 logger.info(f"Created/verified repository: {agent_config.repo_name}")
             
-            # Instantiate the appropriate agent (llm_manager will be set later)
+            # Instantiate the appropriate agent
             if agent_config.content_type == "leetcode":
                 agent = LeetCodeAgent(
                     config=agent_config,
-                    llm_manager=None,  # Will be set later
+                    llm_manager=None,
                     github_manager=self.github_manager
                 )
             elif agent_config.content_type == "documentation":
                 agent = DocumentationAgent(
                     config=agent_config,
-                    llm_manager=None,  # Will be set later
+                    llm_manager=None,
                     github_manager=self.github_manager
                 )
             else:
                 logger.error(f"Unknown agent type: {agent_config.content_type}")
                 return
             
-            # Store agent without llm_manager for now
+            # Add state manager to agent
+            agent.state_manager = self.state_manager
+            
             agent_id = f"{agent_config.name}_{agent_config.repo_name}"
             self.agents[agent_id] = {
                 'agent': agent,
@@ -136,6 +150,8 @@ class AutoCommitterApp:
             
         except Exception as e:
             logger.error(f"Error creating agent {config_data.get('name', 'unknown')}: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     def _initialize_agents(self):
         """Initialize agents with LLM Manager"""
@@ -145,7 +161,6 @@ class AutoCommitterApp:
             
         for agent_id, agent_data in self.agents.items():
             agent = agent_data['agent']
-            config = agent_data['config']
             
             # Update agent with LLM Manager
             agent.llm = self.llm_manager
@@ -153,9 +168,7 @@ class AutoCommitterApp:
             # Register with scheduler
             self.scheduler.register_agent(agent_id, agent)
             
-            # Schedule commits
-            self.scheduler.schedule_daily_commits(agent_id)
-            logger.info(f"Scheduled commits for agent: {agent_id}")
+            logger.info(f"Initialized agent: {agent_id}")
     
     async def test_llm_connection(self):
         """Test LLM connection with a simple prompt"""
@@ -165,12 +178,12 @@ class AutoCommitterApp:
             
         logger.info(f"Testing {settings.llm_provider} connection...")
         
-        test_prompt = "Hello! Please respond with 'Connection successful' and nothing else."
+        test_prompt = "Respond with exactly: 'Connection successful'"
         
         try:
             response = await self.llm_manager.generate_text(test_prompt)
-            logger.info(f"LLM test response: {response}")
-            return "Connection successful" in response or "connection successful" in response.lower()
+            logger.info(f"LLM test response: {response[:100]}...")
+            return "success" in response.lower()
         except Exception as e:
             logger.error(f"LLM connection test failed: {e}")
             return False
@@ -199,8 +212,18 @@ class AutoCommitterApp:
             if aid in self.agents:
                 logger.info(f"Running commit cycle for {aid}...")
                 try:
-                    success = await self.agents[aid]['agent'].execute_commit_cycle()
+                    agent = self.agents[aid]['agent']
+                    success = await agent.execute_commit_cycle()
                     results[aid] = "Success" if success else "Failed"
+                    
+                    # Record in state
+                    self.state_manager.record_commit(
+                        agent_id=aid,
+                        repo_name=agent.config.repo_name,
+                        commit_message="Test commit",
+                        success=success
+                    )
+                    
                     logger.info(f"Commit cycle for {aid}: {results[aid]}")
                 except Exception as e:
                     logger.error(f"Error in commit cycle for {aid}: {e}")
@@ -208,8 +231,8 @@ class AutoCommitterApp:
         
         return results
     
-    def run_scheduled(self):
-        """Run with scheduler (main mode)"""
+    async def run_scheduled(self):
+        """Run with async scheduler (main mode)"""
         logger.info("=" * 60)
         logger.info("Starting Auto-Committer Application")
         logger.info(f"LLM Provider: {settings.llm_provider}")
@@ -217,47 +240,44 @@ class AutoCommitterApp:
         logger.info(f"Managing {len(self.agents)} agents")
         logger.info("=" * 60)
         
+        # Initialize if not already done
+        if not self.is_initialized:
+            await self.initialize()
+            self._initialize_agents()
+        
         # Start the scheduler
-        self.scheduler.start()
+        await self.scheduler.start()
+        
+        # Setup signal handlers for graceful shutdown
+        def signal_handler(sig, frame):
+            logger.info("\nReceived shutdown signal")
+            self.should_stop = True
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
         
         try:
             # Keep the application running
-            while True:
-                # Display status
-                print("\n" + "=" * 40)
-                print("Auto-Committer - Running")
-                print("=" * 40)
-                print(f"Active agents: {len(self.agents)}")
-                print(f"Next scheduled tasks: {len(schedule.get_jobs())}")
-                print("\nCommands:")
-                print("  'status' - Show detailed status")
-                print("  'test <agent>' - Test specific agent")
-                print("  'run now' - Run all agents now")
-                print("  'stop' - Stop the application")
-                print("  'exit' or Ctrl+C - Exit")
-                print("=" * 40)
+            while not self.should_stop:
+                # Display status periodically
+                await asyncio.sleep(300)  # Every 5 minutes
                 
-                user_input = input("\nEnter command: ").strip().lower()
+                status = self.scheduler.get_status()
+                stats = self.state_manager.get_statistics()
                 
-                if user_input == 'stop' or user_input == 'exit':
-                    break
-                elif user_input == 'status':
-                    self.show_status()
-                elif user_input.startswith('test '):
-                    agent_name = user_input[5:].strip()
-                    asyncio.run(self.run_single_commit_cycle(agent_name))
-                elif user_input == 'run now':
-                    asyncio.run(self.run_single_commit_cycle())
-                elif user_input == '':
-                    continue
-                else:
-                    print(f"Unknown command: {user_input}")
+                logger.info("=" * 40)
+                logger.info("Status Update")
+                logger.info(f"Running: {status['running']}")
+                logger.info(f"Upcoming commits: {status['upcoming_commits']}")
+                logger.info(f"Completed today: {status['completed_today']}")
+                logger.info(f"Success rate: {stats['success_rate']}")
+                logger.info("=" * 40)
                     
-        except KeyboardInterrupt:
-            print("\n\nShutting down gracefully...")
+        except Exception as e:
+            logger.error(f"Error in main loop: {e}")
         finally:
-            self.scheduler.stop()
-            logger.info("Application stopped")
+            logger.info("Shutting down...")
+            await self.cleanup()
     
     def show_status(self):
         """Show detailed status of all agents"""
@@ -269,14 +289,33 @@ class AutoCommitterApp:
             agent = agent_data['agent']
             last_commit = agent.last_commit_time
             last_str = last_commit.strftime("%Y-%m-%d %H:%M") if last_commit else "Never"
+            commits_today = self.state_manager.get_agent_commit_count_today(agent_id)
+            
             print(f"\n{agent_id}:")
             print(f"  Type: {agent.config.content_type}")
             print(f"  Repository: {agent.config.repo_name}")
             print(f"  Last commit: {last_str}")
+            print(f"  Commits today: {commits_today}")
             print(f"  Active: {agent.config.is_active}")
         
+        # Scheduler status
+        status = self.scheduler.get_status()
+        stats = self.state_manager.get_statistics()
+        
         print("\n" + "=" * 60)
+        print("SYSTEM STATUS")
+        print("=" * 60)
         print(f"Total agents: {len(self.agents)}")
+        print(f"Scheduler running: {status['running']}")
+        print(f"Upcoming commits: {status['upcoming_commits']}")
+        print(f"Commits today: {stats['commits_today']}")
+        print(f"Total commits: {stats['total_commits_all_time']}")
+        print(f"Success rate: {stats['success_rate']}")
+        
+        if status['next_commit']:
+            next_time = status['next_commit'].strftime("%Y-%m-%d %H:%M:%S")
+            print(f"Next commit: {next_time}")
+        
         print("=" * 60)
     
     async def setup_wizard(self):
@@ -333,21 +372,16 @@ class AutoCommitterApp:
         if mode == '1':
             # Run scheduled mode
             print("\nStarting scheduled mode...")
-            await self.cleanup()  # Cleanup for now, will reinitialize in run_scheduled
-            self.run_scheduled()
+            await self.run_scheduled()
         elif mode == '2':
-            print("\nManual mode selected.")
-            print("Run 'python main.py --manual' to start manual mode.")
-            await self.cleanup()
+            print("\nStarting manual mode...")
+            await self.manual_mode()
         else:
             print("Exiting.")
             await self.cleanup()
     
     async def manual_mode(self):
-        """Manual control mode"""
-        await self.initialize()
-        self._initialize_agents()
-        
+        """Manual control mode with interactive commands"""
         print("\n" + "=" * 60)
         print("MANUAL CONTROL MODE")
         print("=" * 60)
@@ -359,6 +393,7 @@ class AutoCommitterApp:
             print("  'run <agent>' - Run specific agent")
             print("  'run all' - Run all agents")
             print("  'status' - Show agent status")
+            print("  'stats' - Show statistics")
             print("  'exit' - Exit")
             
             cmd = input("\nEnter command: ").strip().lower()
@@ -371,6 +406,14 @@ class AutoCommitterApp:
                     print(f"  {agent_id}")
             elif cmd == 'status':
                 self.show_status()
+            elif cmd == 'stats':
+                stats = self.state_manager.get_statistics()
+                print("\n" + "=" * 40)
+                print("STATISTICS")
+                print("=" * 40)
+                for key, value in stats.items():
+                    print(f"{key}: {value}")
+                print("=" * 40)
             elif cmd.startswith('run '):
                 target = cmd[4:].strip()
                 if target == 'all':
@@ -390,6 +433,8 @@ class AutoCommitterApp:
                 print("Unknown command")
         
         await self.cleanup()
+
+# Entry point functions
 
 async def run_tests():
     """Run connection tests"""
@@ -415,40 +460,29 @@ async def run_tests():
     
     await app.cleanup()
 
-async def run_manual_mode():
-    """Run manual mode"""
-    app = AutoCommitterApp()
-    app.load_agents_config()
-    await app.manual_mode()
-
-async def run_setup_wizard():
-    """Run setup wizard"""
-    app = AutoCommitterApp()
-    app.load_agents_config()
-    await app.setup_wizard()
-
 def main():
     """Main entry point"""
     
     # Check command line arguments
     if len(sys.argv) > 1:
         if sys.argv[1] == "--test":
-            # Test mode
             asyncio.run(run_tests())
             
         elif sys.argv[1] == "--manual":
-            # Manual mode
-            asyncio.run(run_manual_mode())
+            app = AutoCommitterApp()
+            app.load_agents_config()
+            asyncio.run(app.manual_mode())
             
         elif sys.argv[1] == "--setup":
-            # Interactive setup
-            asyncio.run(run_setup_wizard())
+            app = AutoCommitterApp()
+            app.load_agents_config()
+            asyncio.run(app.setup_wizard())
             
         elif sys.argv[1] == "--run":
             # Run in scheduled mode directly
             app = AutoCommitterApp()
             app.load_agents_config()
-            app.run_scheduled()
+            asyncio.run(app.run_scheduled())
             
         else:
             print(f"Unknown argument: {sys.argv[1]}")
@@ -459,7 +493,9 @@ def main():
             print("  --run     : Run in scheduled mode")
     else:
         # Default: interactive setup
-        asyncio.run(run_setup_wizard())
+        app = AutoCommitterApp()
+        app.load_agents_config()
+        asyncio.run(app.setup_wizard())
 
 if __name__ == "__main__":
     main()

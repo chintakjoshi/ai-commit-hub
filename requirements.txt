@@ -1,16 +1,31 @@
-# Core
+# Core async and HTTP
 aiohttp>=3.9.0
 asyncio>=3.4.3
+
+# Configuration and environment
 python-dotenv>=1.0.0
 pyyaml>=6.0
-schedule>=1.2.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
+
+# Retry logic and resilience
 tenacity>=8.2.0
 
-# GitHub
+# GitHub integration
 PyGithub>=2.3.0
 gitpython>=3.1.40
 
-# Logging
+# Logging (optional, stdlib logging is fine too)
 loguru>=0.7.2
+
+# For better datetime handling (optional but recommended)
+python-dateutil>=2.8.2
+
+# For systemd integration if running as service (optional)
+# systemd-python>=235
+
+# Development dependencies (optional)
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# black>=23.0.0
+# flake8>=6.0.0
