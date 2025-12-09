@@ -4,7 +4,7 @@ An automated system that uses AI to generate coding content and commit to GitHub
 # File Structure
 
 ```
-auto-committer/
+ai-commit-hub/
 ├── config/
 │   ├── __init__.py
 │   ├── settings.py
@@ -13,8 +13,7 @@ auto-committer/
 │   ├── __init__.py
 │   ├── base_agent.py
 │   ├── leetcode_agent.py
-│   ├── documentation_agent.py
-│   └── project_agent.py
+│   └── documentation_agent.py
 ├── managers/
 │   ├── __init__.py
 │   ├── github_manager.py
@@ -29,9 +28,17 @@ auto-committer/
 ├── data/
 │   ├── templates/
 │   └── cache/
-├── tests/
+├── repos/                    # Local repository storage
+│   ├── leetcode-solutions-ai/
+│   ├── technical-docs-ai/
+│   ├── coding-challenges-ai/
+│   ├── api-documentation-ai/
+│   ├── algorithm-practice-ai/
+│   └── tutorials-ai/
 ├── requirements.txt
 ├── .env.example
+├── .env                      # Will be created
+├── setup.sh
 ├── main.py
 └── README.md
 ```
