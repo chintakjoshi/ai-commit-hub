@@ -23,7 +23,7 @@ class BaseAgent(ABC):
         self.config = config
         self.llm = llm_manager
         self.github = github_manager
-        self.state_manager = None  # Will be set by app
+        self.state_manager = None
         self.last_commit_time = None
         self.retry_count = 0
         self.max_retries = 3

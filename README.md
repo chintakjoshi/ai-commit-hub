@@ -47,15 +47,15 @@ ai-commit-hub/
 │   └── agents_config.yaml
 ├── agents/
 │   ├── __init__.py
-│   ├── base_agent.py          # Enhanced with state management
+│   ├── base_agent.py
 │   ├── leetcode_agent.py
 │   └── documentation_agent.py
 ├── managers/
 │   ├── __init__.py
 │   ├── github_manager.py
 │   ├── llm_manager.py
-│   ├── scheduler_manager.py   # NEW: Async scheduler
-│   ├── state_manager.py       # NEW: State tracking
+│   ├── scheduler_manager.py
+│   ├── state_manager.py
 │   └── file_manager.py
 ├── utils/
 │   ├── __init__.py
@@ -65,17 +65,17 @@ ai-commit-hub/
 ├── data/
 │   ├── templates/
 │   ├── cache/
-│   └── state.json             # NEW: Persistent state
-├── repos/                      # Local repository storage
+│   └── state.json
+├── repos/
 ├── requirements.txt
 ├── .env.example
 ├── .env
-├── main.py                     # Enhanced main application
-├── auto_committer.log          # NEW: Log file
+├── main.py
+├── auto_committer.log
 └── README.md
 ```
 
-## 🛠️ Setup
+## Setup
 
 ### 1. Clone and Install
 

@@ -20,12 +20,3 @@ loguru>=0.7.2
 
 # For better datetime handling (optional but recommended)
 python-dateutil>=2.8.2
-
-# For systemd integration if running as service (optional)
-# systemd-python>=235
-
-# Development dependencies (optional)
-# pytest>=7.4.0
-# pytest-asyncio>=0.21.0
-# black>=23.0.0
-# flake8>=6.0.0

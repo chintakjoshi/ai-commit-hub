@@ -25,8 +25,8 @@ class AsyncSchedulerManager:
         self.scheduler_task = None
         self.min_commits = min_commits_per_day
         self.max_commits = max_commits_per_day
-        self.min_gap_minutes = 15  # Minimum 15 minutes between commits
-        self.max_gap_minutes = 120  # Maximum 2 hours between commits
+        self.min_gap_minutes = 15
+        self.max_gap_minutes = 120
         
     def register_agent(self, agent_id: str, agent_instance):
         """Register an agent with the scheduler"""
@@ -36,8 +36,8 @@ class AsyncSchedulerManager:
     def generate_daily_schedule(self) -> List[ScheduledTask]:
         """Generate a realistic daily commit schedule"""
         now = datetime.now()
-        start_of_day = now.replace(hour=8, minute=0, second=0, microsecond=0)  # Start at 8 AM
-        end_of_day = now.replace(hour=22, minute=0, second=0, microsecond=0)  # End at 10 PM
+        start_of_day = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        end_of_day = now.replace(hour=22, minute=0, second=0, microsecond=0)
         
         # If we're past 8 AM, start from current time
         if now > start_of_day:
