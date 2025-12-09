@@ -9,7 +9,6 @@ from managers.llm_manager import LLMManager
 from managers.github_manager import GitHubManager
 from managers.scheduler_manager import AsyncSchedulerManager
 from managers.state_manager import StateManager
-from agents.leetcode_agent import LeetCodeAgent
 from agents.documentation_agent import DocumentationAgent
 from agents.base_agent import AgentConfig
 import logging
@@ -80,19 +79,19 @@ class AutoCommitterApp:
         """Create default agents if config file is not found"""
         default_agents = [
             {
-                "name": "leetcode_agent_1",
-                "repo_name": "leetcode-solutions-ai",
-                "content_type": "leetcode",
-                "commit_pattern": "problem_and_solution",
-                "is_active": True,
-                "max_files_per_commit": 4,
-                "min_files_per_commit": 2
-            },
-            {
                 "name": "docs_agent_1",
-                "repo_name": "technical-docs-ai",
+                "repo_name": "technical-docs",
                 "content_type": "documentation",
                 "commit_pattern": "docs_only",
+                "is_active": True,
+                "max_files_per_commit": 2,
+                "min_files_per_commit": 1
+            },
+            {
+                "name": "docs_agent_2",
+                "repo_name": "api-documentation",
+                "content_type": "documentation",
+                "commit_pattern": "api_docs",
                 "is_active": True,
                 "max_files_per_commit": 2,
                 "min_files_per_commit": 1
@@ -120,14 +119,7 @@ class AutoCommitterApp:
             if repo_created:
                 logger.info(f"Created/verified repository: {agent_config.repo_name}")
             
-            # Instantiate the appropriate agent
-            if agent_config.content_type == "leetcode":
-                agent = LeetCodeAgent(
-                    config=agent_config,
-                    llm_manager=None,
-                    github_manager=self.github_manager
-                )
-            elif agent_config.content_type == "documentation":
+            if agent_config.content_type == "documentation":
                 agent = DocumentationAgent(
                     config=agent_config,
                     llm_manager=None,

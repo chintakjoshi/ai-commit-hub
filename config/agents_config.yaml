@@ -1,46 +1,30 @@
 agents:
-  - name: "leetcode_solver_1"
-    repo_name: "leetcode-solutions-ai"
-    content_type: "leetcode"
-    commit_pattern: "problem_and_solution"
-    is_active: true
-    max_files_per_commit: 4
-    min_files_per_commit: 2
-  
   - name: "docs_writer_1"
-    repo_name: "technical-docs-ai"
+    repo_name: "technical-docs"
     content_type: "documentation"
     commit_pattern: "docs_only"
     is_active: true
     max_files_per_commit: 2
     min_files_per_commit: 1
   
-  - name: "leetcode_solver_2"
-    repo_name: "coding-challenges-ai"
-    content_type: "leetcode"
-    commit_pattern: "problem_only"
-    is_active: true
-    max_files_per_commit: 3
-    min_files_per_commit: 1
-  
   - name: "docs_writer_2"
-    repo_name: "api-documentation-ai"
+    repo_name: "api-documentation"
     content_type: "documentation"
     commit_pattern: "api_docs"
     is_active: true
     max_files_per_commit: 2
     min_files_per_commit: 1
   
-  - name: "leetcode_solver_3"
-    repo_name: "algorithm-practice-ai"
-    content_type: "leetcode"
-    commit_pattern: "solution_only"
+  - name: "docs_writer_3"
+    repo_name: "tutorials"
+    content_type: "documentation"
+    commit_pattern: "tutorial"
     is_active: true
-    max_files_per_commit: 3
+    max_files_per_commit: 2
     min_files_per_commit: 1
   
-  - name: "docs_writer_3"
-    repo_name: "tutorials-ai"
+  - name: "docs_writer_4"
+    repo_name: "best-practices"
     content_type: "documentation"
     commit_pattern: "tutorial"
     is_active: true

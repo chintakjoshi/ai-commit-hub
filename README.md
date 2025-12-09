@@ -48,7 +48,6 @@ ai-commit-hub/
 ├── agents/
 │   ├── __init__.py
 │   ├── base_agent.py
-│   ├── leetcode_agent.py
 │   └── documentation_agent.py
 ├── managers/
 │   ├── __init__.py
@@ -129,7 +128,7 @@ Edit `config/agents_config.yaml` to define your agents:
 ```yaml
 agents:
   - name: "leetcode_solver_1"
-    repo_name: "leetcode-solutions-ai"
+    repo_name: "leetcode-solutions"
     content_type: "leetcode"
     commit_pattern: "problem_and_solution"
     is_active: true
@@ -137,7 +136,7 @@ agents:
     min_files_per_commit: 2
   
   - name: "docs_writer_1"
-    repo_name: "technical-docs-ai"
+    repo_name: "technical-docs"
     content_type: "documentation"
     commit_pattern: "docs_only"
     is_active: true
